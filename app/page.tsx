@@ -36,7 +36,8 @@ export default function MetaResearchPromotion() {
     phone: "",
     pixKey: "",
   })
-  const [selectedPixKeyType, setSelectedPixKeyType] = useState<"cpf" | "phone" | "email" | null>(null)
+  type PixKeyType = "cpf" | "phone"
+  const [selectedPixKeyType, setSelectedPixKeyType] = useState<PixKeyType | null>(null)
   const [showUnlockAnimation, setShowUnlockAnimation] = useState(false)
   const [showSupportTooltip, setShowSupportTooltip] = useState(false)
   const [showSupportWidget, setShowSupportWidget] = useState(true)
@@ -54,7 +55,7 @@ export default function MetaResearchPromotion() {
   const [pixCopied, setPixCopied] = useState(false)
   const [showPixStep, setShowPixStep] = useState(false)
   const [pixLoadingComplete, setPixLoadingComplete] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(5 * 60) // 5 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(10 * 60) // 10 minutes in seconds
   const [showUpsell, setShowUpsell] = useState(false)
   const [upsellProducts] = useState([
     {
@@ -279,13 +280,10 @@ export default function MetaResearchPromotion() {
           ? "Digite seu CPF"
           : selectedPixKeyType === "phone"
             ? "(DDD) Seu Numero"
-            : selectedPixKeyType === "email"
-              ? "Digite seu e-mail"
-              : "Selecione o tipo de chave PIX",
+            : "Selecione o tipo de chave PIX",
       pixKeyTypes: {
         cpf: "CPF",
         phone: "Celular",
-        email: "E-mail",
       },
       paymentInfo: "O pagamento será efetuado, após verificação dos dados.",
       confirmData: "CONFIRMAR DADOS",
@@ -665,7 +663,7 @@ export default function MetaResearchPromotion() {
 
   const t = translations[selectedLanguage as keyof typeof translations]
 
-  const validatePixKey = (key: string, type: string) => {
+  const validatePixKey = (key: string, type: PixKeyType) => {
     if (!key || !type) return false
 
     switch (type) {
@@ -677,10 +675,7 @@ export default function MetaResearchPromotion() {
         // Remove caracteres não numéricos e verifica se tem 11 dígitos (incluindo DDD)
         const phone = key.replace(/\D/g, "")
         return phone.length === 11
-      case "email":
-        // Validação básica de email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        return emailRegex.test(key)
+      // Removendo validação de email
       default:
         return false
     }
@@ -1929,8 +1924,8 @@ export default function MetaResearchPromotion() {
                       <label className="block text-sm font-medium text-gray-700 mb-3">{t.pixKey}</label>
 
                       {/* Botões para selecionar tipo de chave PIX */}
-                      <div className="grid grid-cols-3 gap-2 mb-3">
-                        {(["cpf", "phone", "email"] as const).map((type) => (
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        {(["cpf", "phone"] as const).map((type) => (
                           <button
                             key={type}
                             type="button"
@@ -1951,7 +1946,7 @@ export default function MetaResearchPromotion() {
 
                       {/* Campo de input da chave PIX */}
                       <Input
-                        type={selectedPixKeyType === "email" ? "email" : "text"}
+                        type="text"
                         value={paymentData.pixKey}
                         onChange={(e) => handleInputChange("pixKey", e.target.value)}
                         required
@@ -1968,7 +1963,6 @@ export default function MetaResearchPromotion() {
                           <p className="text-red-500 text-xs mt-1">
                             {selectedPixKeyType === "cpf" && "CPF deve ter 11 dígitos"}
                             {selectedPixKeyType === "phone" && "Número deve ter 11 dígitos (com DDD)"}
-                            {selectedPixKeyType === "email" && "Digite um e-mail válido"}
                           </p>
                         )}
                     </div>
