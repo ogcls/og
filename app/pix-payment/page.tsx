@@ -45,7 +45,7 @@ export default function PixPaymentPage() {
           clearInterval(interval)
           setPaymentApproved(true)
           setTimeout(() => {
-            navigateWithUTM("/success")
+            navigateWithUTM("/taxaiof")
           }, 2000)
         }
       }, 5000)

