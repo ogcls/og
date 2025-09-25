@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Montserrat } from "next/font/google"
 import { Open_Sans } from "next/font/google"
+import Script from "next/script"
 import "./globals.css"
 
 const montserrat = Montserrat({
@@ -31,28 +32,25 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={`${montserrat.variable} ${openSans.variable} antialiased`}>
-      <head>
-        <script
+      <body className="font-sans">
+        <Script
+          id="utmify-pixel-config"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               window.pixelId = "68cb44e03b229ea4a4f68cf0";
-              var a = document.createElement("script");
-              a.setAttribute("async", "");
-              a.setAttribute("defer", "");
-              a.setAttribute("src", "https://cdn.utmify.com.br/scripts/pixel/pixel.js");
-              document.head.appendChild(a);
             `,
           }}
         />
-        <script
+        <Script src="https://cdn.utmify.com.br/scripts/pixel/pixel.js" strategy="afterInteractive" async defer />
+        <Script
           src="https://cdn.utmify.com.br/scripts/utms/latest.js"
           data-utmify-prevent-xcod-sck=""
           data-utmify-prevent-subids=""
-          async
-          defer
+          strategy="afterInteractive"
         />
-      </head>
-      <body className="font-sans">{children}</body>
+        {children}
+      </body>
     </html>
   )
 }
