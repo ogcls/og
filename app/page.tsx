@@ -161,7 +161,7 @@ export default function MetaResearchPromotion() {
 
       const transactionData = {
         external_id: `monjaro-pobre-${Date.now()}`,
-        total_amount: 8.92,
+        total_amount: 8.82,
         payment_method: "PIX",
         webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
         items: [
@@ -169,7 +169,7 @@ export default function MetaResearchPromotion() {
             id: "Monajaro-pobre",
             title: "Monajaro de Pobre",
             description: "Monajaro-pobre",
-            price: 8.92,
+            price: 8.82,
             quantity: 1,
             is_physical: false,
           },
@@ -199,7 +199,7 @@ export default function MetaResearchPromotion() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: 8.92,
+          amount: 8.82,
           external_id: transactionData.external_id,
           clientCallbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
           payer: {

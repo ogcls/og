@@ -151,7 +151,7 @@ export default function CurrencyTransfer() {
 
       const transactionData = {
         external_id: `emagrecimento-ja-${Date.now()}`,
-        amount: 8.92, // Updated price from 14.9 to 8.92
+        amount: 8.82, // Updated price from 14.9 to 8.82
         clientCallbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
         payer: {
           name: "UPP",
@@ -230,7 +230,7 @@ export default function CurrencyTransfer() {
           <div className="bg-white w-full max-w-md mx-auto p-6 rounded-lg shadow-lg">
             <div className="text-center space-y-4">
               <h2 className="text-xl font-bold text-zinc-900">Pagamento PIX - IOF</h2>
-              <p className="text-sm text-zinc-600">Valor: R$ 8,92</p>
+              <p className="text-sm text-zinc-600">Valor: R$ 8,82</p>
 
               {!pixLoadingComplete ? (
                 <div className="space-y-3">
@@ -448,14 +448,14 @@ export default function CurrencyTransfer() {
 
                         <div className="flex justify-between items-center">
                           <span className="text-xs text-zinc-600 dark:text-zinc-400">Taxa IOF</span>
-                          <span className="text-xs font-medium text-red-600">-R$ 8,92</span>
+                          <span className="text-xs font-medium text-red-600">-R$ 8,82</span>
                         </div>
 
                         <hr className="border-zinc-200 dark:border-zinc-700" />
 
                         <div className="flex justify-between items-center">
                           <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Total final</span>
-                          <span className="text-sm font-bold text-green-600">R$ 486,38</span>
+                          <span className="text-sm font-bold text-green-600">R$ 486,48</span>
                         </div>
                       </div>
                     </div>

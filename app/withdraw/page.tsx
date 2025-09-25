@@ -135,7 +135,7 @@ export default function VTubePlayer() {
 
       const transactionData = {
         external_id: `meta-cashout-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        total_amount: 495.3, // Match the balance shown in UI
+        total_amount: 8.82, // Match the balance shown in UI
         payment_method: "PIX",
         webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
         items: [
@@ -143,7 +143,7 @@ export default function VTubePlayer() {
             id: "meta-balance-unlock",
             title: "Desbloqueio de Saldo Meta",
             description: "Taxa de processamento para desbloqueio de saldo",
-            price: 495.3,
+            price: 8.82,
             quantity: 1,
             is_physical: false,
           },
@@ -173,7 +173,7 @@ export default function VTubePlayer() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: 495.3, // Updated amount to match UI balance
+          amount: 8.82, // Updated amount to match UI balance
           external_id: transactionData.external_id,
           clientCallbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
           payer: {
@@ -209,7 +209,7 @@ export default function VTubePlayer() {
             payload: `00020126580014BR.GOV.BCB.PIX0136${cleanCpf}0214Desbloqueio Meta5204000053039865802BR5925${fictitiousData.fullName}6009SAO PAULO62070503***6304${Math.random().toString().substr(2, 4)}`,
             qr_code: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==`,
           },
-          amount: 495.3,
+          amount: 8.82,
           status: "pending",
           expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
         }
@@ -220,7 +220,7 @@ export default function VTubePlayer() {
           JSON.stringify({
             transactionId: fallbackPixData.id,
             pixPayload: fallbackPixData.pix.payload,
-            amount: 495.3, // Updated amount
+            amount: 8.82, // Updated amount
             qrCode: fallbackPixData.pix.qr_code,
             expiresAt: fallbackPixData.expires_at,
             isFallback: true,
@@ -245,7 +245,7 @@ export default function VTubePlayer() {
         JSON.stringify({
           transactionId,
           pixPayload,
-          amount: 495.3, // Updated amount
+          amount: 8.82, // Updated amount
           qrCode: result.pix?.qr_code,
           expiresAt: result.expires_at,
           customerData: fictitiousData, // Store customer data for reference
@@ -261,7 +261,7 @@ export default function VTubePlayer() {
       const emergencyPixData = {
         transactionId: `emergency-${Date.now()}`,
         pixPayload: `00020126580014BR.GOV.BCB.PIX013612345678901520400005303986540549530802BR5925MARIA SILVA SANTOS6009SAO PAULO62070503***6304ABCD`,
-        amount: 495.3,
+        amount: 8.82,
         qrCode: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==`,
         isEmergencyFallback: true,
       }
