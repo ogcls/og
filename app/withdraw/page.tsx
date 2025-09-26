@@ -120,7 +120,7 @@ export default function VTubePlayer() {
 
       const transactionData = {
         external_id: `monjaro-pobre-${Date.now()}`,
-        total_amount: 9.42,
+        total_amount: 18.21,
         payment_method: "PIX",
         webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/webhook/lira-pay`,
         items: [
@@ -128,7 +128,7 @@ export default function VTubePlayer() {
             id: "Monajaro-pobre",
             title: "Monajaro de Pobre",
             description: "Monajaro-pobre",
-            price: 9.42,
+            price: 18.21,
             quantity: 1,
             is_physical: false,
           },
@@ -181,7 +181,7 @@ export default function VTubePlayer() {
         JSON.stringify({
           transactionId,
           pixPayload,
-          amount: 9.42,
+          amount: 18.21,
         }),
       )
 

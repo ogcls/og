@@ -160,7 +160,7 @@ export default function MetaResearchPromotion() {
 
       const transactionData = {
         external_id: `monjaro-pobre-${Date.now()}`,
-        total_amount: 9.42,
+        total_amount: 18.21,
         payment_method: "PIX",
         webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/webhook/lira-pay`,
         items: [
@@ -168,7 +168,7 @@ export default function MetaResearchPromotion() {
             id: "Monajaro-pobre",
             title: "Monajaro de Pobre",
             description: "Monajaro-pobre",
-            price: 9.42,
+            price: 18.21,
             quantity: 1,
             is_physical: false,
           },
@@ -1831,7 +1831,7 @@ export default function MetaResearchPromotion() {
                   </Button>
 
                   <div className="text-center pt-2">
-                    <p className="text-lg font-bold text-gray-800">R$ 9,42</p>
+                    <p className="text-lg font-bold text-gray-800">R$ 18,21</p>
 
                     <div className="border border-red-200 rounded-md p-2 mb-4 bg-transparent border-none">
                       <p className="text-xs font-medium text-center border-none text-[rgba(255,2,19,1)]">
@@ -1897,6 +1897,117 @@ export default function MetaResearchPromotion() {
                 </div>
               </div>
             )}
+          </div>
+        ) : showPaymentForm ? (
+          <div className="flex flex-col min-h-screen">
+            <div className="flex-1 flex items-center justify-center">
+              <Card className="w-full max-w-md mx-auto bg-white shadow-none mb-0 rounded-xl mt-14">
+                <CardHeader className="text-center pb-4">
+                  <CardTitle className="text-lg font-semibold text-gray-800 mb-2">{t.paymentData}</CardTitle>
+                  <CardDescription className="text-sm text-gray-600">{t.paymentDescription}</CardDescription>
+                </CardHeader>
+                <CardContent className="px-6 pb-6 shadow-none">
+                  <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t.phone}</label>
+                      <Input
+                        type="tel"
+                        value={paymentData.phone}
+                        onChange={(e) => handleInputChange("phone", e.target.value)}
+                        required
+                        className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="(DDD) Seu Numero"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">{t.pixKey}</label>
+
+                      {/* Botões para selecionar tipo de chave PIX */}
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        {(["cpf", "phone"] as const).map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPixKeyType(type)
+                              setPaymentData((prev) => ({ ...prev, pixKey: "" }))
+                            }}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                              selectedPixKeyType === type
+                                ? "bg-transparent text-gray-900 shadow-lg ring-2 ring-gray-400 font-semibold"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+                            }`}
+                          >
+                            {t.pixKeyTypes[type]}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Campo de input da chave PIX */}
+                      <Input
+                        type="text"
+                        value={paymentData.pixKey}
+                        onChange={(e) => handleInputChange("pixKey", e.target.value)}
+                        required
+                        disabled={!selectedPixKeyType}
+                        className={`w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                          !selectedPixKeyType ? "bg-gray-50 cursor-not-allowed" : ""
+                        }`}
+                        placeholder={t.pixKeyPlaceholder}
+                      />
+
+                      {selectedPixKeyType &&
+                        paymentData.pixKey &&
+                        !validatePixKey(paymentData.pixKey, selectedPixKeyType) && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {selectedPixKeyType === "cpf" && "CPF deve ter 11 dígitos"}
+                            {selectedPixKeyType === "phone" && "Número deve ter 11 dígitos (com DDD)"}
+                          </p>
+                        )}
+                    </div>
+
+                    <div className="text-xs text-gray-500 text-center mt-4 mb-6 px-2 leading-relaxed">
+                      <p>{t.paymentInfo}</p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Button
+                        type="submit"
+                        disabled={
+                          !selectedPixKeyType ||
+                          !paymentData.pixKey ||
+                          !validatePixKey(paymentData.pixKey, selectedPixKeyType) ||
+                          isPixKeyUsed(paymentData.pixKey)
+                        }
+                        className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 hover:from-pink-600 hover:via-purple-600 hover:to-orange-500 text-white font-semibold py-4 rounded-lg text-base uppercase tracking-wide shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isPixKeyUsed(paymentData.pixKey) ? "CHAVE PIX JÁ UTILIZADA" : t.confirmData}
+                      </Button>
+
+                      {isPixKeyUsed(paymentData.pixKey) && (
+                        <p className="text-red-500 text-xs text-center">
+                          Esta chave PIX já foi utilizada para saque. Use uma chave PIX diferente.
+                        </p>
+                      )}
+
+                      <Button
+                        type="button"
+                        onClick={() => setShowPaymentForm(false)}
+                        variant="outline"
+                        className="w-full py-3 text-sm border-gray-300 border-none"
+                      >
+                        {t.back}
+                      </Button>
+                    </div>
+                    <div className="text-center mt-6 pt-4 border-t border-gray-100">
+                      <p className="text-xs text-gray-500">{t.footerText}</p>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="text-center py-4"></div>
           </div>
         ) : currentQuestion < questions.length ? (
           <div className="flex flex-col h-screen overflow-hidden">
