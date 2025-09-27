@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { PodPayAPI } from "@/lib/podpay-api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,46 +9,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Transaction ID required" }, { status: 400 })
     }
 
-    console.log("[v0] Checking payment status for transaction:", transactionId)
+    // Here you would typically check the payment status with Lira Pay API
+    // For now, we'll simulate a successful payment after some time
+    // In production, you should call Lira Pay's API to get the real status
 
-    if (transactionId.startsWith("fallback-")) {
-      console.log("[v0] Detected fallback transaction ID, returning mock status")
-      // For fallback transactions, return a pending status since they're demo/test transactions
-      return NextResponse.json({
-        status: "pending",
-        id: transactionId,
-        amount: 8.82,
-        paymentMethod: "pix",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-    }
+    const response = await fetch(`https://api.lirapaybr.com/v1/transactions/${transactionId}`, {
+      headers: {
+        "api-secret":
+          process.env.PIXUP_CLIENT_SECRET ||
+          "sk_8b52ca56c36e31150c6f647d5ce3e492a67f0ceb588a06e7345843a7019264cd829675a3e8366ff9554007cb88f6548aaffe8afdaadcc3bf13e765278e2cb780",
+        "Content-Type": "application/json",
+      },
+    })
 
-    const result = await PodPayAPI.getTransaction(transactionId)
-
-    if (!result.success) {
-      console.error("[v0] Error getting transaction status:", result.error)
-      return NextResponse.json(
-        {
-          error: result.error,
-          status: "error",
-        },
-        { status: 400 },
-      )
-    }
+    const data = await response.json()
 
     return NextResponse.json({
-      status: result.data?.status,
+      status: data.status,
       id: transactionId,
-      amount: result.data?.amount,
-      paymentMethod: result.data?.paymentMethod,
-      pixPayload: result.data?.pixPayload,
-      boletoUrl: result.data?.boletoUrl,
-      createdAt: result.data?.createdAt,
-      updatedAt: result.data?.updatedAt,
     })
   } catch (error) {
-    console.error("[v0] Error checking payment status:", error)
+    console.error("Error checking payment status:", error)
     return NextResponse.json({ error: "Error checking payment status" }, { status: 500 })
   }
 }

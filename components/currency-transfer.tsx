@@ -125,7 +125,7 @@ export default function CurrencyTransfer() {
         const response = await fetch(`/api/check-payment-status?id=${transactionId}`)
         const data = await response.json()
 
-        if (data.status === "approved" || data.status === "AUTHORIZED" || data.status === "PAID") {
+        if (data.status === "AUTHORIZED" || data.status === "PAID") {
           clearInterval(interval)
           setPaymentApproved(true)
           setTimeout(() => {
@@ -150,34 +150,20 @@ export default function CurrencyTransfer() {
       const utmParams = getUTMParams()
 
       const transactionData = {
-        amount: 882, // Convert to cents (8.82 * 100)
-        currency: "BRL",
-        paymentMethod: "pix",
-        items: [
-          {
-            externalRef: `emagrecimento-ja-${Date.now()}`,
-            title: "IOF Payment",
-            unitPrice: 882,
-            quantity: 1,
-            tangible: false, // Added required tangible field for PodPay API
-          },
-        ],
-        customer: {
+        external_id: `emagrecimento-ja-${Date.now()}`,
+        amount: 8.82, // Updated price from 14.9 to 8.82
+        clientCallbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
+        payer: {
           name: "UPP",
           email: "cliente@email.com",
-          document: {
-            number: "18219822821",
-            type: "cpf",
-          },
+          document: "18219822821",
         },
-        pix: {
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        },
+        utm_params: utmParams,
       }
 
-      console.log("[v0] Creating IOF PIX payment with PodPay:", transactionData)
+      console.log("[v0] Creating IOF PIX payment with data:", transactionData)
 
-      const response = await fetch("/api/podpay/create-transaction", {
+      const response = await fetch("/api/keyclub/deposit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -187,18 +173,18 @@ export default function CurrencyTransfer() {
 
       const result = await response.json()
 
-      console.log("[v0] IOF PodPay PIX payment response:", result)
+      console.log("[v0] IOF PIX payment response:", result)
 
-      if (!result.success) {
-        console.error("[v0] IOF PodPay PIX payment error:", result)
-        throw new Error(result.error || "Erro ao criar pagamento PIX")
+      if (result.hasError) {
+        console.error("[v0] IOF PIX payment error:", result)
+        throw new Error(result.message || "Erro ao criar pagamento PIX")
       }
 
-      const transactionId = result.data?.id
-      const pixPayload = result.data?.pixPayload
+      const transactionId = result.id || result.transaction_id || result.external_id
+      const pixPayload = result.pix?.payload || result.pix_code || result.qr_code
 
       if (!transactionId || !pixPayload) {
-        console.error("[v0] Missing required fields in PodPay response:", result)
+        console.error("[v0] Missing required fields in response:", result)
         throw new Error("Resposta da API incompleta")
       }
 
@@ -210,7 +196,7 @@ export default function CurrencyTransfer() {
         setPixLoadingComplete(true)
       }, 3000)
 
-      checkPaymentStatus(transactionId)
+      checkPaymentStatus(result.id)
     } catch (error) {
       console.error("[v0] Erro ao criar pagamento PIX IOF:", error)
       const errorMessage = error instanceof Error ? error.message : "Erro desconhecido"

